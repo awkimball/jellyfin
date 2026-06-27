@@ -1660,6 +1660,18 @@ namespace MediaBrowser.Controller.MediaEncoding
                 // TODO: probe QSV encoders' capabilities and enable more tuning options
                 // See also https://github.com/intel/media-delivery/blob/master/doc/quality.rst
 
+                // HDR passthrough re-encodes to the same codec/resolution purely to repackage
+                // the bitstream, so it cannot exceed the source's visual quality. A fixed
+                // target bitrate just pads the output toward the client's ceiling (e.g. 30Mbps
+                // for a ~4Mbps source). Use Intelligent Constant Quality (ICQ) so the output
+                // tracks scene complexity while preserving the HDR grade.
+                if (string.Equals(videoCodec, "hevc_qsv", StringComparison.OrdinalIgnoreCase)
+                    && IsHdrPassthroughEncodeAvailable(state))
+                {
+                    const int HdrPassthroughIcqQuality = 20;
+                    return FormattableString.Invariant($" -global_quality {HdrPassthroughIcqQuality}");
+                }
+
                 // Enable MacroBlock level bitrate control for better subjective visual quality
                 var mbbrcOpt = string.Empty;
                 if (string.Equals(videoCodec, "h264_qsv", StringComparison.OrdinalIgnoreCase)
