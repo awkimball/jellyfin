@@ -1850,7 +1850,13 @@ public class DynamicHlsController : BaseJellyfinApiController
                 }
             }
 
-            args += " -start_at_zero";
+            // -start_at_zero re-bases the copied stream to playback-zero after a seek, which
+            // drifts it away from CopyTimestamps subtitle cues (kept on the absolute timeline)
+            // by the seek offset. Skip it when the client requested CopyTimestamps.
+            if (!state.BaseRequest.CopyTimestamps)
+            {
+                args += " -start_at_zero";
+            }
         }
         else
         {
