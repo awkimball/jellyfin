@@ -113,6 +113,18 @@ public class EncodingHelperDoviTests
 
         Assert.False(helper.IsDoviRemoved(state));
         Assert.Equal("-bsf:v hevc_mp4toannexb", helper.GetBitStreamArgs(state, MediaStreamType.Video));
+        Assert.Null(helper.GetBitStreamArgs(state, MediaStreamType.Video, "mp4"));
+    }
+
+    [Fact]
+    public void GetBitStreamArgs_Mp4Output_OmitsAnnexBFilter()
+    {
+        var state = CreateState("hevc", "smpte2084");
+        state.BaseRequest.VideoRangeType = "DOVI";
+        var helper = CreateHelper(true);
+
+        Assert.True(helper.IsDoviRemoved(state));
+        Assert.Equal("-bsf:v hevc_metadata=remove_dovi=1", helper.GetBitStreamArgs(state, MediaStreamType.Video, "mp4"));
     }
 
     private static EncodingJobInfo CreateState(string codec, string? transfer)
