@@ -331,7 +331,7 @@ namespace Jellyfin.LiveTv.TunerHosts.HdHomerun
                 SupportsTranscoding = true,
                 IsInfiniteStream = true,
                 IgnoreDts = true,
-                UseMostCompatibleTranscodingProfile = true, // All HDHR tuners require this
+                UseMostCompatibleTranscodingProfile = !info.AllowFmp4TranscodingContainer,
                 FallbackMaxStreamingBitrate = info.FallbackMaxStreamingBitrate,
                 // IgnoreIndex = true,
                 // ReadAtNativeFramerate = true
