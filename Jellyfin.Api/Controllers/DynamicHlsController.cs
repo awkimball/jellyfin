@@ -1838,8 +1838,10 @@ public class DynamicHlsController : BaseJellyfinApiController
         // See if we can save come cpu cycles by avoiding encoding.
         if (EncodingHelper.IsCopyCodec(codec))
         {
-            // If h264_mp4toannexb is ever added, do not use it for live tv.
-            if (state.VideoStream is not null && !string.Equals(state.VideoStream.NalLengthSize, "0", StringComparison.OrdinalIgnoreCase))
+            // mp4toannexb is only valid for MPEG-TS; fMP4 needs length-prefixed NALs (avcC/hvcC), so only apply it for TS output.
+            if (string.Equals(segmentContainer, "ts", StringComparison.OrdinalIgnoreCase)
+                && state.VideoStream is not null
+                && !string.Equals(state.VideoStream.NalLengthSize, "0", StringComparison.OrdinalIgnoreCase))
             {
                 string bitStreamArgs = _encodingHelper.GetBitStreamArgs(state, MediaStreamType.Video);
                 if (!string.IsNullOrEmpty(bitStreamArgs))
