@@ -1883,13 +1883,23 @@ namespace MediaBrowser.Controller.MediaEncoding
             else if (string.Equals(state.ActualOutputVideoCodec, "hevc", StringComparison.OrdinalIgnoreCase)
                      || string.Equals(state.ActualOutputVideoCodec, "h265", StringComparison.OrdinalIgnoreCase))
             {
-                // Transcode to level 5.0 and lower for maximum compatibility.
-                // Level 5.0 is suitable for up to 4k 30fps hevc encoding, otherwise let the encoder to handle it.
-                // https://en.wikipedia.org/wiki/High_Efficiency_Video_Coding_tiers_and_levels
-                // MaxLumaSampleRate = 3840*2160*30 = 248832000 < 267386880.
-                if (requestLevel < 0 || requestLevel >= 150)
+                // L5.0 covers up to 4K30; higher pixel rates (e.g. 4K60) need 5.1/5.2 or strict decoders reject the stream.
+                // Max luma sample rate: L5.0 = 267386880, L5.1 = 534773760.
+                var width = state.VideoStream?.Width ?? 0;
+                var height = state.VideoStream?.Height ?? 0;
+                var frameRate = state.VideoStream?.ReferenceFrameRate
+                    ?? state.VideoStream?.RealFrameRate
+                    ?? state.VideoStream?.AverageFrameRate
+                    ?? 0;
+                var lumaSampleRate = (double)width * height * frameRate;
+
+                var minLevel = lumaSampleRate > 534773760 ? 156 // 5.2
+                    : lumaSampleRate > 267386880 ? 153 // 5.1
+                    : 150; // 5.0
+
+                if (requestLevel < 0 || requestLevel >= minLevel)
                 {
-                    return "150";
+                    return minLevel.ToString(CultureInfo.InvariantCulture);
                 }
             }
             else if (string.Equals(state.ActualOutputVideoCodec, "h264", StringComparison.OrdinalIgnoreCase))
