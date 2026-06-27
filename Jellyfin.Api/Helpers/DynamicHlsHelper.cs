@@ -468,8 +468,24 @@ public class DynamicHlsHelper
             }
             else
             {
-                // Currently we only encode to SDR.
-                builder.Append(",VIDEO-RANGE=SDR");
+                // Preserve the source HDR format on HDR passthrough re-encode; otherwise output is SDR.
+                if (_encodingHelper.IsHdrPassthroughEncodeAvailable(state))
+                {
+                    switch (videoRangeType)
+                    {
+                        case VideoRangeType.HLG:
+                        case VideoRangeType.DOVIWithHLG:
+                            builder.Append(",VIDEO-RANGE=HLG");
+                            break;
+                        default:
+                            builder.Append(",VIDEO-RANGE=PQ");
+                            break;
+                    }
+                }
+                else
+                {
+                    builder.Append(",VIDEO-RANGE=SDR");
+                }
             }
         }
     }
