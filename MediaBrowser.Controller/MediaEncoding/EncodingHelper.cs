@@ -1493,7 +1493,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                                                   && CanEncoderRemoveDynamicHdrMetadata(DynamicHdrMetadataRemovalPlan.RemoveHdr10Plus, state.VideoStream);
         }
 
-        public string GetBitStreamArgs(EncodingJobInfo state, MediaStreamType streamType)
+        public string GetBitStreamArgs(EncodingJobInfo state, MediaStreamType streamType, string outputContainer = "ts")
         {
             if (state is null)
             {
@@ -1506,11 +1506,14 @@ namespace MediaBrowser.Controller.MediaEncoding
                 MediaStreamType.Video => state.VideoStream,
                 _ => state.VideoStream
             };
+            var isTsOutput = string.IsNullOrWhiteSpace(outputContainer)
+                || string.Equals(outputContainer.TrimStart('.'), "ts", StringComparison.OrdinalIgnoreCase);
+
             // TODO This is auto inserted into the mpegts mux so it might not be needed.
             // https://www.ffmpeg.org/ffmpeg-bitstream-filters.html#h264_005fmp4toannexb
             if (IsH264(stream))
             {
-                return "-bsf:v h264_mp4toannexb";
+                return isTsOutput ? "-bsf:v h264_mp4toannexb" : null;
             }
 
             if (IsAAC(stream))
@@ -1521,7 +1524,11 @@ namespace MediaBrowser.Controller.MediaEncoding
 
             if (IsH265(stream))
             {
-                var filter = "-bsf:v hevc_mp4toannexb";
+                var filters = new List<string>();
+                if (isTsOutput)
+                {
+                    filters.Add("hevc_mp4toannexb");
+                }
 
                 // The following checks are not complete because the copy would be rejected
                 // if the encoder cannot remove required metadata.
@@ -1532,16 +1539,18 @@ namespace MediaBrowser.Controller.MediaEncoding
                     case DynamicHdrMetadataRemovalPlan.None:
                         break;
                     case DynamicHdrMetadataRemovalPlan.RemoveDovi:
-                        filter += _mediaEncoder.SupportsBitStreamFilterWithOption(BitStreamFilterOptionType.HevcMetadataRemoveDovi)
-                            ? ",hevc_metadata=remove_dovi=1"
-                            : ",dovi_rpu=strip=1";
+                        filters.Add(_mediaEncoder.SupportsBitStreamFilterWithOption(BitStreamFilterOptionType.HevcMetadataRemoveDovi)
+                            ? "hevc_metadata=remove_dovi=1"
+                            : "dovi_rpu=strip=1");
                         break;
                     case DynamicHdrMetadataRemovalPlan.RemoveHdr10Plus:
-                        filter += ",hevc_metadata=remove_hdr10plus=1";
+                        filters.Add("hevc_metadata=remove_hdr10plus=1");
                         break;
                 }
 
-                return filter;
+                return filters.Count == 0
+                    ? null
+                    : "-bsf:v " + string.Join(',', filters);
             }
 
             if (IsAv1(stream))
