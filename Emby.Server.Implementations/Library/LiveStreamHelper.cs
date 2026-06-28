@@ -28,6 +28,14 @@ namespace Emby.Server.Implementations.Library
         private readonly IApplicationPaths _appPaths;
         private readonly JsonSerializerOptions _jsonOptions = JsonDefaults.Options;
 
+        /// <summary>
+        /// Live stream content can change over time (e.g. an IPTV channel switching from an SDR
+        /// placeholder/slate to the live HDR feed), so a probed media info is only reused for a short
+        /// window. This still absorbs rapid re-opens (client reconnects/retries) without re-probing,
+        /// while a deliberate later tune-in re-probes and picks up the changed stream.
+        /// </summary>
+        private static readonly TimeSpan _liveMediaInfoCacheExpiry = TimeSpan.FromSeconds(60);
+
         public LiveStreamHelper(IMediaEncoder mediaEncoder, ILogger logger, IApplicationPaths appPaths)
         {
             _mediaEncoder = mediaEncoder;
@@ -44,7 +52,9 @@ namespace Emby.Server.Implementations.Library
             MediaInfo? mediaInfo = null;
             var cacheFilePath = string.IsNullOrEmpty(cacheKey) ? null : Path.Combine(_appPaths.CachePath, "mediainfo", cacheKey.GetMD5().ToString("N", CultureInfo.InvariantCulture) + ".json");
 
-            if (cacheFilePath is not null)
+            // Only reuse a recent probe: a missing file yields an ancient timestamp, so it falls through to a re-probe.
+            if (cacheFilePath is not null
+                && DateTime.UtcNow - File.GetLastWriteTimeUtc(cacheFilePath) <= _liveMediaInfoCacheExpiry)
             {
                 try
                 {
