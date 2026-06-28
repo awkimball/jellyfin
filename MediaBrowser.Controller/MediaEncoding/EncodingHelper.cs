@@ -4793,8 +4793,12 @@ namespace MediaBrowser.Controller.MediaEncoding
             }
 
             var rangeType = videoStream.VideoRangeType;
-            var isHdr10 = rangeType == VideoRangeType.HDR10;
-            var isHlg = rangeType == VideoRangeType.HLG;
+
+            // Dolby Vision with a cross-compatible base layer (Profile 8.1 over HDR10, 8.4 over HLG)
+            // can be treated as its base format: the QSV re-encode drops the DoVi RPU but preserves the
+            // PQ/HLG base and its HDR10 static metadata, yielding a clean HDR10/HLG stream the client can play.
+            var isHdr10 = rangeType == VideoRangeType.HDR10 || rangeType == VideoRangeType.DOVIWithHDR10;
+            var isHlg = rangeType == VideoRangeType.HLG || rangeType == VideoRangeType.DOVIWithHLG;
             if (!isHdr10 && !isHlg)
             {
                 return false;
