@@ -4783,6 +4783,15 @@ namespace MediaBrowser.Controller.MediaEncoding
                 return false;
             }
 
+            // A client that caps the output bit depth below 10 (e.g. multi-view forcing a
+            // light 8-bit SDR stream via MaxVideoBitDepth=8) is explicitly asking for the HDR
+            // source to be tonemapped down, not passed through. Honor that cap.
+            var requestedBitDepth = state.GetRequestedVideoBitDepth(state.ActualOutputVideoCodec);
+            if (requestedBitDepth.HasValue && requestedBitDepth.Value < 10)
+            {
+                return false;
+            }
+
             var rangeType = videoStream.VideoRangeType;
             var isHdr10 = rangeType == VideoRangeType.HDR10;
             var isHlg = rangeType == VideoRangeType.HLG;
