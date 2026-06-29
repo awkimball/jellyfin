@@ -1632,7 +1632,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             return ".ts";
         }
 
-        private string GetVideoBitrateParam(EncodingJobInfo state, string videoCodec)
+        private string GetVideoBitrateParam(EncodingJobInfo state, string videoCodec, EncodingOptions encodingOptions)
         {
             if (state.OutputVideoBitrate is null)
             {
@@ -1679,6 +1679,15 @@ namespace MediaBrowser.Controller.MediaEncoding
                 {
                     const int HdrPassthroughIcqQuality = 20;
                     return FormattableString.Invariant($" -global_quality {HdrPassthroughIcqQuality}");
+                }
+
+                if (string.Equals(videoCodec, "hevc_qsv", StringComparison.OrdinalIgnoreCase)
+                    && state.MediaSource.IsInfiniteStream
+                    && string.Equals(state.VideoStream?.Codec, "mpeg2video", StringComparison.OrdinalIgnoreCase)
+                    && encodingOptions.LiveMpeg2HevcQsvIcqQuality > 0)
+                {
+                    var icqQuality = Math.Clamp(encodingOptions.LiveMpeg2HevcQsvIcqQuality, 1, 51);
+                    return FormattableString.Invariant($" -global_quality {icqQuality}");
                 }
 
                 // Some less powerful H.264 HW decoders require strict CPB size
@@ -2216,7 +2225,7 @@ namespace MediaBrowser.Controller.MediaEncoding
             var encodingPreset = encodingOptions.EncoderPreset;
 
             param += GetEncoderParam(encodingPreset, defaultPreset, encodingOptions, videoEncoder, isLibX265);
-            param += GetVideoBitrateParam(state, videoEncoder);
+            param += GetVideoBitrateParam(state, videoEncoder, encodingOptions);
 
             var framerate = GetFramerateParam(state);
             if (framerate.HasValue)
