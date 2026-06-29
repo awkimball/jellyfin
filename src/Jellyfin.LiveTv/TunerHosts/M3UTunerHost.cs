@@ -30,7 +30,7 @@ namespace Jellyfin.LiveTv.TunerHosts
 {
     public class M3UTunerHost : BaseTunerHost, ITunerHost, IConfigurableTunerHost
     {
-        private static readonly string[] _mimeTypesCanShareHttpStream = ["video/MP2T"];
+        private static readonly string[] _mimeTypesCanShareHttpStream = ["video/MP2T", "video/mpeg"];
         private static readonly string[] _extensionsCanShareHttpStream = [".ts", ".tsv", ".m2t"];
 
         private readonly IHttpClientFactory _httpClientFactory;
