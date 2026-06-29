@@ -4,6 +4,7 @@
 #pragma warning disable CS1591
 
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Threading;
@@ -96,6 +97,13 @@ namespace Jellyfin.LiveTv.TunerHosts
 
         public Stream GetStream()
         {
+            var stopwatch = Stopwatch.StartNew();
+            while (!File.Exists(TempFilePath) && stopwatch.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                LiveStreamCancellationTokenSource.Token.ThrowIfCancellationRequested();
+                Thread.Sleep(100);
+            }
+
             var stream = new FileStream(
                 TempFilePath,
                 FileMode.Open,
