@@ -307,6 +307,25 @@ public class DynamicHlsController : BaseJellyfinApiController
                     // If the playlist doesn't already exist, startup ffmpeg
                     try
                     {
+                        var requestDeviceId = streamingRequest.DeviceId;
+                        var killDeviceTranscodes = !string.IsNullOrWhiteSpace(requestDeviceId);
+                        var playSessionIdToKill = !streamingRequest.AllowVideoStreamCopy
+                            ? null
+                            : streamingRequest.PlaySessionId;
+                        if (!streamingRequest.AllowVideoStreamCopy && killDeviceTranscodes)
+                        {
+                            _logger.LogInformation(
+                                "Forced HLS playlist requested; stopping existing transcodes for DeviceId {DeviceId} before starting PlaySessionId {PlaySessionId}",
+                                requestDeviceId,
+                                streamingRequest.PlaySessionId);
+                        }
+
+                        if (killDeviceTranscodes)
+                        {
+                            await _transcodeManager.KillTranscodingJobs(requestDeviceId!, playSessionIdToKill, p => false)
+                                .ConfigureAwait(false);
+                        }
+
                         job = await _transcodeManager.StartFfMpeg(
                                 state,
                                 playlistPath,
@@ -1505,7 +1524,18 @@ public class DynamicHlsController : BaseJellyfinApiController
                 // If the playlist doesn't already exist, startup ffmpeg
                 try
                 {
-                    await _transcodeManager.KillTranscodingJobs(streamingRequest.DeviceId, streamingRequest.PlaySessionId, p => false)
+                    var playSessionIdToKill = !streamingRequest.AllowVideoStreamCopy
+                        ? null
+                        : streamingRequest.PlaySessionId;
+                    if (!streamingRequest.AllowVideoStreamCopy)
+                    {
+                        _logger.LogInformation(
+                            "Forced HLS transcode requested; stopping existing transcodes for DeviceId {DeviceId} before starting PlaySessionId {PlaySessionId}",
+                            streamingRequest.DeviceId,
+                            streamingRequest.PlaySessionId);
+                    }
+
+                    await _transcodeManager.KillTranscodingJobs(streamingRequest.DeviceId, playSessionIdToKill, p => false)
                         .ConfigureAwait(false);
 
                     if (currentTranscodingIndex.HasValue)
@@ -1623,6 +1653,11 @@ public class DynamicHlsController : BaseJellyfinApiController
             ? _encodingOptions.MaxMuxingQueueSize.ToString(CultureInfo.InvariantCulture)
             : "128";
 
+        var avoidNegativeTs = state.MediaSource.IsInfiniteStream
+                              && string.Equals(segmentContainer, "mp4", StringComparison.OrdinalIgnoreCase)
+            ? "make_zero"
+            : "disabled";
+
         var baseUrlParam = string.Empty;
         if (isEventPlaylist)
         {
@@ -1634,13 +1669,14 @@ public class DynamicHlsController : BaseJellyfinApiController
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "{0} {1} -map_metadata -1 -map_chapters -1 -threads {2} {3} {4} {5} -copyts -avoid_negative_ts disabled -max_muxing_queue_size {6} -f hls -max_delay 5000000 -hls_time {7} -hls_segment_type {8} -start_number {9}{10} -hls_segment_filename \"{11}\" {12} -y \"{13}\"",
+            "{0} {1} -map_metadata -1 -map_chapters -1 -threads {2} {3} {4} {5} -copyts -avoid_negative_ts {6} -max_muxing_queue_size {7} -f hls -max_delay 5000000 -hls_time {8} -hls_segment_type {9} -start_number {10}{11} -hls_segment_filename \"{12}\" {13} -y \"{14}\"",
             inputModifier,
             _encodingHelper.GetInputArgument(state, _encodingOptions, segmentContainer),
             threads,
             mapArgs,
             GetVideoArguments(state, startNumber, isEventPlaylist, segmentContainer),
             GetAudioArguments(state),
+            avoidNegativeTs,
             maxMuxingQueueSize,
             state.SegmentLength.ToString(CultureInfo.InvariantCulture),
             segmentFormat,

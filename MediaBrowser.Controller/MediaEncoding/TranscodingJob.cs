@@ -248,24 +248,37 @@ public sealed class TranscodingJob : IDisposable
 
             var process = Process;
 
-            if (!HasExited)
+            if (process is null || HasExited)
             {
-                try
-                {
-                    _logger.LogInformation("Stopping ffmpeg process with q command for {Path}", Path);
+                return;
+            }
 
-                    process!.StandardInput.WriteLine("q");
+            // Ask ffmpeg to quit gracefully first. This can fail (stdin no longer writable,
+            // or ffmpeg wedged on a stalled input) — which must NOT prevent the force-kill
+            // below, otherwise the process lingers and leaks its tuner and GPU time.
+            try
+            {
+                _logger.LogInformation("Stopping ffmpeg process with q command for {Path}", Path);
+                process.StandardInput.WriteLine("q");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to send q to ffmpeg for {Path}; forcing kill", Path);
+            }
 
-                    // Need to wait because killing is asynchronous.
-                    if (!process.WaitForExit(5000))
-                    {
-                        _logger.LogInformation("Killing FFmpeg process for {Path}", Path);
-                        process.Kill();
-                    }
-                }
-                catch (InvalidOperationException)
+            // Force-kill the whole process tree if it hasn't exited shortly after the q,
+            // regardless of whether the q was actually delivered.
+            try
+            {
+                if (!process.WaitForExit(5000))
                 {
+                    _logger.LogInformation("Killing FFmpeg process (tree) for {Path}", Path);
+                    process.Kill(entireProcessTree: true);
                 }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error killing ffmpeg process for {Path}", Path);
             }
 #pragma warning restore CA1849
         }
