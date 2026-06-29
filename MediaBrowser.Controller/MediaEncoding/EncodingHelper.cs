@@ -1672,7 +1672,7 @@ namespace MediaBrowser.Controller.MediaEncoding
                     // quality, more work) for 4K60 HDR can fall below 1x, so the stream never
                     // builds its startup segments in time and stalls. Give live more headroom;
                     // VOD has no real-time constraint, so it can use the higher quality.
-                    var icqQuality = state.MediaSource.IsInfiniteStream ? 23 : 20;
+                    var icqQuality = state.MediaSource.IsInfiniteStream ? 21 : 20;
                     return FormattableString.Invariant($" -global_quality {icqQuality}");
                 }
 
