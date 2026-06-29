@@ -98,7 +98,15 @@ namespace Jellyfin.LiveTv.TunerHosts
             {
                 var extension = Path.GetExtension(new UriBuilder(mediaSource.Path).Path);
 
-                if (string.IsNullOrEmpty(extension))
+                if (_extensionsCanShareHttpStream.Contains(extension, StringComparison.OrdinalIgnoreCase))
+                {
+                    return new SharedHttpStream(mediaSource, tunerHost, streamId, FileSystem, _httpClientFactory, Logger, Config, _appHost, _streamHelper);
+                }
+
+                // Some M3U live URLs have a non-container suffix (for example HDHomeRun
+                // virtual channel URLs proxied as /6555.1). If the extension is not a
+                // known transport stream extension, fall back to the response MIME type.
+                if (!_extensionsCanShareHttpStream.Contains(extension, StringComparison.OrdinalIgnoreCase))
                 {
                     try
                     {
@@ -119,10 +127,6 @@ namespace Jellyfin.LiveTv.TunerHosts
                     {
                         Logger.LogWarning("HEAD request to check MIME type failed, shared stream disabled");
                     }
-                }
-                else if (_extensionsCanShareHttpStream.Contains(extension, StringComparison.OrdinalIgnoreCase))
-                {
-                    return new SharedHttpStream(mediaSource, tunerHost, streamId, FileSystem, _httpClientFactory, Logger, Config, _appHost, _streamHelper);
                 }
             }
 
