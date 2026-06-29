@@ -43,6 +43,7 @@ public class EncodingOptions
         VppTonemappingContrast = 1;
         H264Crf = 23;
         H265Crf = 28;
+        LiveMpeg2HevcQsvIcqQuality = 23;
         EncoderPreset = EncoderPreset.auto;
         DeinterlaceDoubleRate = false;
         DeinterlaceMethod = DeinterlaceMethod.yadif;
@@ -214,6 +215,11 @@ public class EncodingOptions
     /// Gets or sets the H265 CRF.
     /// </summary>
     public int H265Crf { get; set; }
+
+    /// <summary>
+    /// Gets or sets the QSV ICQ quality used for live MPEG-2 to HEVC transcodes. Set to 0 to use bitrate mode.
+    /// </summary>
+    public int LiveMpeg2HevcQsvIcqQuality { get; set; }
 
     /// <summary>
     /// Gets or sets the encoder preset.
