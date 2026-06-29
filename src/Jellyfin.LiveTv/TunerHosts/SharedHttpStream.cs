@@ -49,29 +49,32 @@ namespace Jellyfin.LiveTv.TunerHosts
 
             var url = mediaSource.Path;
 
-            Directory.CreateDirectory(Path.GetDirectoryName(TempFilePath) ?? throw new InvalidOperationException("Path can't be a root directory."));
-
             var typeName = GetType().Name;
             Logger.LogInformation("Opening {StreamType} Live stream from {Url}", typeName, url);
 
-            // Response stream is disposed manually.
-            var response = await _httpClientFactory.CreateClient(NamedClient.Default)
-                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, CancellationToken.None)
+            using var linkedTokenSource = CancellationTokenSource.CreateLinkedTokenSource(
+                openCancellationToken,
+                LiveStreamCancellationTokenSource.Token);
+            linkedTokenSource.CancelAfter(TimeSpan.FromSeconds(10));
+
+            using var response = await _httpClientFactory.CreateClient(NamedClient.Default)
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead, linkedTokenSource.Token)
                 .ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
 
-            var taskCompletionSource = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-            _ = StartStreaming(response, taskCompletionSource, LiveStreamCancellationTokenSource.Token);
-
-            MediaSource.Path = _appHost.GetApiUrlForLocalAccess() + "/LiveTv/LiveStreamFiles/" + UniqueId + "/stream.ts";
-            MediaSource.Protocol = MediaProtocol.Http;
-
-            var res = await taskCompletionSource.Task.ConfigureAwait(false);
-            if (!res)
+            await using var stream = await response.Content.ReadAsStreamAsync(linkedTokenSource.Token).ConfigureAwait(false);
+            var buffer = new byte[188];
+            var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), linkedTokenSource.Token).ConfigureAwait(false);
+            if (bytesRead <= 0)
             {
-                Logger.LogWarning("Zero bytes copied from stream {StreamType} to {FilePath} but no exception raised", GetType().Name, TempFilePath);
+                Logger.LogWarning("Zero bytes read while opening stream {StreamType} from {Url}", GetType().Name, url);
                 throw new EndOfStreamException(string.Format(CultureInfo.InvariantCulture, "Zero bytes copied from stream {0}", GetType().Name));
             }
+
+            MediaSource.Path = url;
+            MediaSource.Protocol = MediaProtocol.Http;
+            EnableStreamSharing = false;
+            DateOpened = DateTime.UtcNow;
         }
 
         private Task StartStreaming(HttpResponseMessage response, TaskCompletionSource<bool> openTaskCompletionSource, CancellationToken cancellationToken)
@@ -101,7 +104,7 @@ namespace Jellyfin.LiveTv.TunerHosts
                                         stream,
                                         fileStream,
                                         IODefaults.CopyToBufferSize,
-                                        () => Resolve(openTaskCompletionSource),
+                                        () => Resolve(openTaskCompletionSource, fileStream),
                                         cancellationToken).ConfigureAwait(false);
                                 }
                             }
@@ -126,8 +129,14 @@ namespace Jellyfin.LiveTv.TunerHosts
                 CancellationToken.None);
         }
 
-        private void Resolve(TaskCompletionSource<bool> openTaskCompletionSource)
+        private void Resolve(TaskCompletionSource<bool> openTaskCompletionSource, FileStream stream)
         {
+            stream.Flush(true);
+            if (!File.Exists(TempFilePath) || new FileInfo(TempFilePath).Length == 0)
+            {
+                return;
+            }
+
             DateOpened = DateTime.UtcNow;
             openTaskCompletionSource.TrySetResult(true);
         }

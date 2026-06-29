@@ -201,7 +201,10 @@ namespace Jellyfin.LiveTv.TunerHosts
                 SupportsDirectStream = supportsDirectStream,
 
                 RequiredHttpHeaders = httpHeaders,
-                UseMostCompatibleTranscodingProfile = !info.AllowFmp4TranscodingContainer,
+                // The M3U tuner UI does not expose AllowFmp4TranscodingContainer. Without
+                // this, M3U live streams use the "most compatible" progressive TS profile,
+                // which native AVPlayer cannot reliably play. Use the fMP4/HLS profiles.
+                UseMostCompatibleTranscodingProfile = false,
                 FallbackMaxStreamingBitrate = info.FallbackMaxStreamingBitrate
             };
 
