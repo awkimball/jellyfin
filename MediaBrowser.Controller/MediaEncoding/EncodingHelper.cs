@@ -1668,11 +1668,9 @@ namespace MediaBrowser.Controller.MediaEncoding
                 if (string.Equals(videoCodec, "hevc_qsv", StringComparison.OrdinalIgnoreCase)
                     && IsHdrPassthroughEncodeAvailable(state))
                 {
-                    // Live must encode in real time: on a modest GPU a lower ICQ value (higher
-                    // quality, more work) for 4K60 HDR can fall below 1x, so the stream never
-                    // builds its startup segments in time and stalls. Give live more headroom;
-                    // VOD has no real-time constraint, so it can use the higher quality.
-                    var icqQuality = state.MediaSource.IsInfiniteStream ? 21 : 20;
+                    // ICQ 20 keeps live HDR passthrough close to source quality while avoiding
+                    // the bitrate padding that made remuxed 4K live streams unnecessarily heavy.
+                    var icqQuality = 20;
                     return FormattableString.Invariant($" -global_quality {icqQuality}");
                 }
 
