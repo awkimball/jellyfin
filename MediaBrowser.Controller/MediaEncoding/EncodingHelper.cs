@@ -2691,6 +2691,14 @@ namespace MediaBrowser.Controller.MediaEncoding
                 reasons |= TranscodeReason.AudioCodecNotSupported;
             }
 
+            var requestedProfiles = state.GetRequestedAudioProfiles(audioStream.Codec);
+            if (requestedProfiles.Length > 0
+                && (string.IsNullOrEmpty(audioStream.Profile)
+                    || !requestedProfiles.Contains(audioStream.Profile, StringComparison.OrdinalIgnoreCase)))
+            {
+                reasons |= TranscodeReason.AudioProfileNotSupported;
+            }
+
             // Channels must fall within requested value
             var channels = state.GetRequestedAudioChannels(audioStream.Codec);
             if (channels.HasValue

@@ -12,6 +12,7 @@ using MediaBrowser.Model.Dlna;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
+using MediaBrowser.Model.Session;
 using Moq;
 using Xunit;
 
@@ -221,6 +222,30 @@ public class EncodingHelperTests
         var args = CreateHelper().GetProgressiveAudioFullCommandLine(state, new EncodingOptions(), "/tmp/out");
 
         Assert.Contains("-ar " + expectedSampleRate, args, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("LC", true, 0)]
+    [InlineData("HE-AAC", false, (int)TranscodeReason.AudioProfileNotSupported)]
+    public void CanStreamCopyAudio_AudioProfileConstraint_Honored(
+        string sourceProfile,
+        bool expectedCanCopy,
+        int expectedReason)
+    {
+        var audio = new MediaStream { Index = 0, Type = MediaStreamType.Audio, Codec = "aac", Profile = sourceProfile };
+        var request = new VideoRequestDto { AudioCodec = "aac" };
+        request.StreamOptions["aac-profile"] = "LC";
+        var state = new EncodingJobInfo(TranscodingJobType.Hls)
+        {
+            BaseRequest = request,
+            AudioStream = audio,
+            OutputAudioCodec = "aac"
+        };
+
+        var canCopy = CreateHelper().CanStreamCopyAudio(state, audio, ["aac"], out var reasons);
+
+        Assert.Equal(expectedCanCopy, canCopy);
+        Assert.Equal((TranscodeReason)expectedReason, reasons);
     }
 
     private static EncodingJobInfo BuildAudioState(string audioCodec, int requestedSampleRate)
